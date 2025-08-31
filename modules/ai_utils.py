@@ -98,14 +98,36 @@ def parse_resume_from_pdf(pdf_bytes: bytes):
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=ResumeData)
         
+        # --- FIX: Added a more explicit, detailed example for parsing the Skills section ---
         prompt = PromptTemplate(
-            template="""Parse the following resume text into a structured JSON object. Adhere strictly to the schema. If a field is missing, use an empty string or list.
+            template="""You are an expert resume parser. Your task is to analyze the text from a resume and extract the information into a structured JSON object.
+            
+            Pay close attention to the requested schema. If a field is not present, leave it as an empty string or list.
+            
+            Here is an example of how to handle an education entry like "Vidyaniketan PU College, Percentage: 96.43":
+            "education": [
+                {{
+                  "degree": "Higher Secondary", "institution": "Vidyaniketan PU College", "dates": "June 2021-June 2023",
+                  "grade_type": "Percentage", "grade_value": "96.43"
+                }}
+            ]
 
-            Example (Education): "education": [{{"degree": "Higher Secondary", "institution": "Vidyaniketan PU College", "dates": "June 2021-June 2023", "grade_type": "Percentage", "grade_value": "96.43"}}]
-            Example (Skills): "skills": [{{"category": "Languages", "details": "Python, Java"}}, {{"category": "AI/ML", "details": "LangChain, RAG"}}]
+            Here is an example of how to handle a skills section like "Languages: Python, Java | AI/ML: LangChain, RAG":
+            "skills": [
+                {{
+                    "category": "Languages",
+                    "details": "Python, Java"
+                }},
+                {{
+                    "category": "AI/ML",
+                    "details": "LangChain, RAG"
+                }}
+            ]
 
-            You MUST return ONLY the JSON object.
+            **IMPORTANT**: You MUST format your response as a single JSON object that strictly adheres to the schema. Do not include any other text.
+
             {format_instructions}
+            
             RESUME TEXT:
             {resume_text}
             """,
@@ -128,7 +150,6 @@ def analyze_github_repo(url: str):
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=ProjectDetails)
         
-        # --- FIX: Made the prompt stricter to force JSON output ---
         prompt = PromptTemplate(
             template="""You are an expert at analyzing GitHub README files. Based on the following document, extract the project's title, a 2-bullet point description, and its tech stack.
             
