@@ -193,7 +193,7 @@ def categorize_skills(skills_list: List[str]):
     try:
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=SkillList)
-        prompt = PromptTemplate(template="Categorize these skills into logical groups. Return ONLY JSON.\n{format_instructions}\nSKILLS:\n{skills}", input_variables=["skills"], partial_variables={"format_instructions": parser.get_format_instructions()})
+        prompt = PromptTemplate(template="Categorize these skills into logical groups accurately like (languages:Python, java  Frontend Technolgies: React.js , Database: MongoDB, SQL , AIML Frameworks:Langchain , Backend Technologies:Node.js, Express.js)like that. Return ONLY JSON.\n{format_instructions}\nSKILLS:\n{skills}", input_variables=["skills"], partial_variables={"format_instructions": parser.get_format_instructions()})
         chain = prompt | llm | parser
         response = _invoke_with_retry(chain, {"skills": ", ".join(skills_list)})
         if isinstance(response, dict) and "error" in response:
