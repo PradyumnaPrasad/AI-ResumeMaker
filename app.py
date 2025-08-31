@@ -9,8 +9,8 @@ if not os.path.exists('output'):
     os.makedirs('output')
 if 'resume_data' not in st.session_state:
     st.session_state.resume_data = {
-        "name": "Pradyumna Prasad", "email": "pradyumnaprasad.05@gmail.com", "phone": "+91 9739355997",
-        "linkedin": "https://linkedin.com/in/pradyumna-prasad-2667802b8", "github": "https://github.com/PradyumnaPrasad", "leetcode": "https://leetcode.com/u/Pradyumna_Prasad/",
+        "name": "", "email": "", "phone": "",
+        "linkedin": "", "github": "", "leetcode": "",
         "summary": "", "internships": [], "experience": [], "projects": [], "skills": [],
         "education": [], "achievements": [], "leadership": []
     }
