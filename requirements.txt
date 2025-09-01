@@ -1,0 +1,11 @@
+bs4>=0.0.,
+langchain>=0.3.2,
+langchain-community>=0.3.2,
+langchain-google-genai>=2.1.1,
+pdfplumber>=0.11.,
+pymupdf>=1.26.,
+pypdf>=6.0.,
+python-docx>=1.2.,
+reportlab>=4.4.,
+streamlit>=1.49.,
+svglib>=1.5.
