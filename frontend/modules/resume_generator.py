@@ -1,3 +1,4 @@
+import os
 from docx import Document
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
@@ -5,11 +6,15 @@ from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import A4 
 from templates.template1 import create_pradyumna_style_template
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
 
 def generate_pdf(resume_data, output_path="output/resume.pdf"):
     """
     Generates a PDF resume using ReportLab and a specified template function.
     """
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
     doc = SimpleDocTemplate(output_path, pagesize=A4,
                            topMargin=40, bottomMargin=40,
                            leftMargin=40, rightMargin=40)
