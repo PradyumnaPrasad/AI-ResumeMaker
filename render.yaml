@@ -1,8 +1,8 @@
 services:
   - type: web
     name: resume-maker-backend
-    env: python
-    buildCommand: "pip install --no-cache-dir -r requirements.txt"
+    dockerfilePath: Dockerfile
+    dockerContext: .
     startCommand: "uvicorn main:app --host 0.0.0.0 --port 8000"
     rootDir: backend
     ports:
@@ -13,8 +13,8 @@ services:
 
   - type: web
     name: resume-maker-frontend
-    env: python
-    buildCommand: "pip install --no-cache-dir -r requirements.txt"
+    dockerfilePath: Dockerfile
+    dockerContext: .
     startCommand: "streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
     rootDir: frontend
     ports:
