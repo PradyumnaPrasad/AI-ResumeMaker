@@ -76,7 +76,8 @@ def create_pradyumna_style_template(story, data, use_custom_font=False):
             story.append(Spacer(1, 10))
 
     def render_skills():
-        story.append(Paragraph("".join([f"<b>{s.get('category')}:</b> {s.get('details')}<br/>" for s in data.get('skills', [])]), styles['SkillsBody']))
+
+        story.append(Paragraph("".join([f"<b>{s.get('category', '')}:</b> {s.get('details', '')}<br/>" for s in data.get('skills', [])]), styles['SkillsBody']))
 
     def render_experience(experience_list):
         for item in experience_list:
