@@ -2,6 +2,7 @@
 
 This is a sophisticated, AI-driven web application built with Streamlit and FastAPI that empowers users to create professional, polished resumes with ease. The application leverages the power of Large Language Models (LLMs) through the Google Gemini API to automate and enhance various aspects of the resume-building process, from data entry to content generation.
 
+
 ## ✨ Key Features
 
 This project is more than just a form-filler; it's a suite of intelligent tools designed to streamline resume creation:

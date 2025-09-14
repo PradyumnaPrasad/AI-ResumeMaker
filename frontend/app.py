@@ -1,13 +1,40 @@
 import streamlit as st
 import os
 import requests
+import base64
 from modules.resume_generator import generate_pdf
 
 # --- CONFIGURATION ---
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="AI Resume Maker", page_icon="📄", layout="centered")
+st.set_page_config(page_title="AI Resume Maker", page_icon="📄", layout="wide")
+
+# --- CUSTOM CSS ---
+def load_css():
+    st.markdown("""
+        <style>
+            .stApp {
+                background-color: #00000;
+            }
+            .st-sidebar {
+                background-color: #ffffff;
+            }
+            .stButton>button {
+                background-color: ##FF4D00;
+                color: white;
+                border-radius: 20px;
+                border: 1px solid ##FF4D00;
+            }
+            .stButton>button:hover {
+                background-color: #CC3D00;
+                border: 1px solid #CC3D00;
+            }
+            .st-progress > div > div > div > div {
+                background-color: #4CAF50;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- SESSION STATE INITIALIZATION ---
 def initialize_session_state():
@@ -15,6 +42,7 @@ def initialize_session_state():
     if 'resume_data' not in st.session_state: st.session_state.resume_data = {}
     if 'page' not in st.session_state: st.session_state.page = "Import Resume"
     if 'ai_suggestions' not in st.session_state: st.session_state.ai_suggestions = []
+    if 'pdf_preview' not in st.session_state: st.session_state.pdf_preview = None
 
 initialize_session_state()
 
@@ -67,7 +95,6 @@ def toggle_project_selection(project_data):
         st.session_state.resume_data.setdefault('projects', []).append(new_project)
 
 # --- UI COMPONENTS ---
-
 def show_login_signup_ui():
     st.markdown("<style>.stApp { background-color: #000000; }</style>", unsafe_allow_html=True)
     st.title("Welcome to the AI Resume Maker")
@@ -97,39 +124,54 @@ def show_login_signup_ui():
                         else: st.error(f"Failed to create account: {response.json().get('detail')}")
 
 def show_main_app_ui():
-    page_options = ["Import Resume", "Personal Info", "Skills", "Summary", "Education", "Projects", "Internship Experience (Optional)", "Work Experience (Optional)", "Achievements & Leadership", "Generate Resume"]
-    st.sidebar.title("Resume Sections")
-    st.session_state.page = st.sidebar.radio("Go to", page_options, key="page_nav", index=page_options.index(st.session_state.page))
+    load_css()
+    page_options = ["Import Resume", "Personal Info", "Skills", "Summary", "Education", "Projects", "Internship Experience", "Work Experience", "Achievements & Leadership", "Generate Resume"]
+    
+    st.sidebar.title("📄 AI Resume Maker")
+    st.sidebar.markdown("---")
+    
+    # Progress Bar
+    progress = len([p for p in page_options[:-1] if st.session_state.resume_data.get(p.lower().replace(' ', '_').replace('&', 'and').strip(), None)]) / (len(page_options) -1)
+    st.sidebar.progress(progress)
+    st.sidebar.markdown(f"**{int(progress*100)}% Complete**")
+    
+    st.sidebar.markdown("---")
+    st.session_state.page = st.sidebar.radio("Navigation", page_options, key="page_nav", index=page_options.index(st.session_state.page))
     st.sidebar.markdown("---")
     if st.sidebar.button("Save Progress", type="primary"): save_resume_data()
     if st.sidebar.button("Logout"):
         st.session_state.token = None
         st.session_state.resume_data = {}
+        st.session_state.pdf_preview = None
         st.rerun()
-    st.title("📄 AI-Powered Resume Maker")
-    st.info("Fill only the sections you require. Empty sections will be hidden automatically.")
+
+    st.title(st.session_state.page)
+    
     render_page(st.session_state.page)
+
     current_page_index = page_options.index(st.session_state.page)
     col1, _, col3 = st.columns([1, 3, 1])
     with col1:
         if current_page_index > 0:
-            if st.button("Previous"):
+            if st.button(" <--Previous"):
                 save_resume_data()
                 st.session_state.page = page_options[current_page_index - 1]
                 st.rerun()
     with col3:
         if current_page_index < len(page_options) - 1:
-            if st.button("Next", type="primary"):
+            if st.button("Next-->", type="primary"):
                 save_resume_data()
                 st.session_state.page = page_options[current_page_index + 1]
                 st.rerun()
 
 def render_page(page):
-    page_map = {p: globals()[f"render_{p.lower().replace(' ', '_').replace('&', 'and').replace('(optional)','').strip()}_page"] for p in ["Import Resume", "Personal Info", "Skills", "Summary", "Education", "Projects", "Achievements & Leadership", "Generate Resume"]}
-    page_map["Internship Experience (Optional)"] = lambda: render_experience_page("Internship")
-    page_map["Work Experience (Optional)"] = lambda: render_experience_page("Work")
+    page_map = {p: globals()[f"render_{p.lower().replace(' ', '_').replace('&', 'and').strip()}_page"] for p in ["Import Resume", "Personal Info", "Skills", "Summary", "Education", "Projects", "Achievements & Leadership", "Generate Resume"]}
+    page_map["Internship Experience"] = lambda: render_experience_page("Internship")
+    page_map["Work Experience"] = lambda: render_experience_page("Work")
     with st.container(border=True):
         page_map[page]()
+
+
 
 # --- DEDICATED PAGE RENDERING FUNCTIONS ---
 def render_import_resume_page():
@@ -141,22 +183,32 @@ def render_import_resume_page():
             response = api_request('post', '/ai/parse-resume/', files=files)
             if response and response.status_code == 200:
                 st.session_state.resume_data = response.json()
-                for key in ['education', 'projects', 'internships', 'experience', 'skills', 'achievements', 'leadership']:
-                    if key not in st.session_state.resume_data or st.session_state.resume_data[key] is None:
-                        st.session_state.resume_data[key] = []
-        st.success("Resume successfully parsed!"); st.balloons()
-        st.rerun()
+                if not any(st.session_state.resume_data.values()):
+                    st.warning("Could not parse any information from the resume. Please fill the details manually.")
+                else:
+                    for key in ['education', 'projects', 'internships', 'experience', 'skills', 'achievements', 'leadership']:
+                        if key not in st.session_state.resume_data or st.session_state.resume_data[key] is None:
+                            st.session_state.resume_data[key] = []
+                    st.success("Resume successfully parsed!"); st.balloons()
+                    st.rerun()
+            else:
+                st.error("Failed to parse resume. Please fill the details manually.")
 
 def render_personal_info_page():
-    st.header("Personal Information")
+    st.header("👤 Personal Information")
     data = st.session_state.resume_data
-    data['name'] = st.text_input("Full Name", data.get('name', ''))
-    c1, c2 = st.columns(2); data['email'] = c1.text_input("Email", data.get('email', '')); data['phone'] = c2.text_input("Phone Number", data.get('phone', ''))
-    c3, c4 = st.columns(2); data['linkedin'] = c3.text_input("LinkedIn URL", data.get('linkedin', '')); data['github'] = c4.text_input("GitHub URL", data.get('github', ''))
-    data['leetcode'] = st.text_input("LeetCode URL", data.get('leetcode', ''))
+    col1, col2 = st.columns(2)
+    with col1:
+        data['name'] = st.text_input("Full Name", data.get('name', ''))
+        data['email'] = st.text_input("Email", data.get('email', ''))
+        data['linkedin'] = st.text_input("LinkedIn URL", data.get('linkedin', ''))
+    with col2:
+        data['phone'] = st.text_input("Phone Number", data.get('phone', ''))
+        data['github'] = st.text_input("GitHub URL", data.get('github', ''))
+        data['leetcode'] = st.text_input("LeetCode URL", data.get('leetcode', ''))
 
 def render_skills_page():
-    st.header("Skills")
+    st.header("🛠️ Skills")
     raw_skills_input = ", ".join([s.get('details', '') for s in st.session_state.resume_data.get('skills', [])])
     raw_skills = st.text_area("Enter all your skills, separated by commas", value=raw_skills_input)
     if st.button("Categorize Skills with AI ✨"):
@@ -172,7 +224,7 @@ def render_skills_page():
         for cat in st.session_state.resume_data['skills']: st.markdown(f"**{cat.get('category')}:** {cat.get('details')}")
 
 def render_summary_page():
-    st.header("Professional Summary")
+    st.header("📝 Professional Summary")
     st.session_state.resume_data['summary'] = st.text_area("Your Summary", st.session_state.resume_data.get('summary', ''), height=200)
     st.subheader("✨ AI Assistant")
     job_desc = st.text_area("Optional: Paste a target job description")
@@ -187,11 +239,9 @@ def render_summary_page():
                     st.toast("Summary generated!"); st.rerun()
 
 def render_education_page():
-    st.header("Education")
+    st.header("🎓 Education")
     for i, edu in enumerate(st.session_state.resume_data.get('education', [])):
-        with st.container(border=True):
-            st.write(f"**{edu.get('degree')}** from {edu.get('institution')}")
-            st.button("Remove", key=f"remove_edu_{i}", on_click=remove_item, args=('education', i))
+        with st.container(border=True): st.write(f"**{edu.get('degree')}** from {edu.get('institution')}"); st.button("Remove", key=f"remove_edu_{i}", on_click=remove_item, args=('education', i))
     with st.form("new_edu_form", clear_on_submit=True):
         st.subheader("Add New Education")
         degree, inst = st.text_input("Degree / Course"), st.text_input("Institution")
@@ -202,7 +252,7 @@ def render_education_page():
             st.toast("Education added!"); st.rerun()
 
 def render_projects_page():
-    st.header("Projects")
+    st.header("💼 Projects")
     st.subheader("🤖 AI GitHub Repo Analyzer")
     repo_url = st.text_input("Paste a GitHub repository URL to auto-add")
     if st.button("Analyze and Add Repository"):
@@ -245,7 +295,7 @@ def render_projects_page():
 
 def render_experience_page(exp_type):
     key = "internships" if exp_type == "Internship" else "experience"
-    st.header(f"{exp_type} Experience")
+    st.header(f"🏢 {exp_type} Experience")
     for i, item in enumerate(st.session_state.resume_data.get(key, [])):
         with st.container(border=True): st.write(f"**{item.get('role')}** at {item.get('company')}"); st.button("Remove", key=f"rem_{key}_{i}", on_click=remove_item, args=(key, i))
     with st.form(f"new_{key}_form", clear_on_submit=True):
@@ -257,14 +307,14 @@ def render_experience_page(exp_type):
             st.toast(f"{exp_type} added!"); st.rerun()
 
 def render_achievements_and_leadership_page():
-    st.header("Achievements")
+    st.header("🏆 Achievements")
     for i, ach in enumerate(st.session_state.resume_data.get('achievements', [])):
         st.text(f"• {ach}"); st.button("Remove", key=f"rem_ach_{i}", on_click=remove_item, args=('achievements', i))
     with st.form("new_ach_form", clear_on_submit=True):
         ach_text = st.text_input("Add new achievement")
         if st.form_submit_button("Add Achievement"): st.session_state.resume_data.setdefault('achievements',[]).append(ach_text); st.toast("Achievement added!"); st.rerun()
     st.divider()
-    st.header("Leadership & Activities")
+    st.header("🤝 Leadership & Activities")
     for i, act in enumerate(st.session_state.resume_data.get('leadership', [])):
         st.text(f"• {act}"); st.button("Remove", key=f"rem_act_{i}", on_click=remove_item, args=('leadership', i))
     with st.form("new_act_form", clear_on_submit=True):
@@ -272,22 +322,45 @@ def render_achievements_and_leadership_page():
         if st.form_submit_button("Add Activity"): st.session_state.resume_data.setdefault('leadership',[]).append(act_text); st.toast("Activity added!"); st.rerun()
 
 def render_generate_resume_page():
-    st.header("Finalize and Download")
-    st.subheader("Arrange Sections")
-    all_sections = ["Summary", "Education", "Projects", "Skills", "Internship Experience", "Work Experience", "Achievements", "Activities & Leadership"]
-    key_map = {s: s.lower().replace(" ", "_").replace("&", "and") for s in all_sections}
-    available = [s for s in all_sections if st.session_state.resume_data.get(key_map[s], [])]
-    current_order = [s for s in st.session_state.resume_data.get('section_order', available) if s in available]
-    for s in available:
-        if s not in current_order: current_order.append(s)
-    ordered_sections = st.multiselect("Set section order:", options=all_sections, default=current_order, label_visibility="collapsed")
-    st.session_state.resume_data['section_order'] = ordered_sections
-    st.divider()
-    if st.button("Generate Resume PDF 🚀", use_container_width=True, type="primary"):
-        with st.spinner("Building your resume..."):
-            pdf_path = generate_pdf(st.session_state.resume_data)
-            with open(pdf_path, "rb") as pdf_file: PDFbyte = pdf_file.read()
-            st.download_button(label="Download Resume as PDF", data=PDFbyte, file_name=f"{st.session_state.resume_data.get('name','resume').replace(' ','_')}_Resume.pdf", mime="application/octet-stream", use_container_width=True)
+    st.header("🎉 Finalize and Download")
+    
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Arrange Sections")
+        all_sections = ["Summary", "Education", "Projects", "Skills", "Internship Experience", "Work Experience", "Achievements", "Activities & Leadership"]
+        key_map = {s: s.lower().replace(" ", "_").replace("&", "and") for s in all_sections}
+        available = [s for s in all_sections if st.session_state.resume_data.get(key_map[s], [])]
+        current_order = [s for s in st.session_state.resume_data.get('section_order', available) if s in available]
+        for s in available:
+            if s not in current_order: current_order.append(s)
+        ordered_sections = st.multiselect("Set section order:", options=all_sections, default=current_order, label_visibility="collapsed")
+        st.session_state.resume_data['section_order'] = ordered_sections
+        
+        if st.button("Generate Resume PDF 🚀", use_container_width=True, type="primary"):
+            if not any(st.session_state.resume_data.get(key_map[s]) for s in all_sections):
+                st.warning("Your resume is empty. Please add some information before generating the PDF.")
+            else:
+                with st.spinner("Building your resume..."):
+                    pdf_path = generate_pdf(st.session_state.resume_data)
+                    with open(pdf_path, "rb") as f:
+                        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+                    st.session_state.pdf_preview = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
+
+    with col2:
+        if st.session_state.pdf_preview:
+            st.subheader("Resume Preview")
+            st.markdown(st.session_state.pdf_preview, unsafe_allow_html=True)
+            pdf_path = "output/resume.pdf"
+            with open(pdf_path, "rb") as pdf_file:
+                PDFbyte = pdf_file.read()
+            st.download_button(
+                label="Download Resume as PDF",
+                data=PDFbyte,
+                file_name=f"{st.session_state.resume_data.get('name','resume').replace(' ','_')}_Resume.pdf",
+                mime="application/octet-stream",
+                use_container_width=True
+            )
 
 # --- MAIN APPLICATION LOGIC ---
 if st.session_state.token is None:
