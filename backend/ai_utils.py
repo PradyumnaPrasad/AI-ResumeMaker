@@ -44,7 +44,7 @@ def _invoke_with_retry(chain, params):
 
 def _parse_skills(resume_text: str, api_key: str) -> List[Dict[str, str]]:
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.0)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=SkillListInternal)
         template = """Extract the skills from the resume text and categorize them into logical groups.
 {format_instructions}
@@ -67,7 +67,7 @@ def parse_resume_from_pdf(pdf_bytes: bytes):
     try:
         pdf_reader = pypdf.PdfReader(BytesIO(pdf_bytes))
         resume_text = "".join([page.extract_text() or "" for page in pdf_reader.pages])
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.0)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0.0)
         main_parser = JsonOutputParser(pydantic_object=ResumeData)
         main_prompt_template = """You are an expert resume parser. Analyze the resume text and extract the information into a structured JSON object.
 Pay close attention to all sections EXCEPT for skills.
@@ -108,7 +108,7 @@ def analyze_github_repo(url: str):
     try:
         loader = WebBaseLoader(url)
         docs = loader.load()
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.0)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=ProjectDetails)
         prompt = PromptTemplate(
             template="""Analyze the GitHub README file. Extract the project title, a 2-bullet point description, and its tech stack.
@@ -130,7 +130,7 @@ def suggest_projects(skills: List[SkillCategory]):
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key: return {"error": "GOOGLE_API_KEY not set."}
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.7)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0.7)
         parser = JsonOutputParser(pydantic_object=SuggestedProjects)
         skills_text = ", ".join([f"{s['category']}: {s['details']}" for s in skills])
         prompt = PromptTemplate(template="Suggest 2 project ideas based on the user's skills. Return ONLY a JSON object.\n{format_instructions}\nUSER'S SKILLS: {skills}", input_variables=["skills"], partial_variables={"format_instructions": parser.get_format_instructions()})
@@ -146,7 +146,7 @@ def categorize_skills(skills_list: List[str]):
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key: return [{"category": "Error", "details": "GOOGLE_API_KEY not set."}]
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.0)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0.0)
         parser = JsonOutputParser(pydantic_object=SkillListInternal)
         prompt = PromptTemplate(template="Categorize these skills into logical groups (e.g., Languages:python,java, Frontend:react, html, css,stremalit, Backend:node.js,express.js,fastapi, AI/ML:langchain,RAG , scikit-learn,tensorflow ,Developer tools like git,github, cs fundamentals like OS,DBMS, CN,machine learning,DL,DSA). Return ONLY JSON.\n{format_instructions}\nSKILLS:\n{skills}", input_variables=["skills"], partial_variables={"format_instructions": parser.get_format_instructions()})
         chain = prompt | llm | parser
@@ -171,7 +171,7 @@ def generate_summary_from_skills_and_role(skills: List[SkillCategory], job_descr
         )
         
         prompt = PromptTemplate.from_template(prompt_text)
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.0, google_api_key=api_key)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0, google_api_key=api_key)
         chain = prompt | llm
         response = _invoke_with_retry(chain, {"skills_text": skills_text, "job_description": job_description})
         
