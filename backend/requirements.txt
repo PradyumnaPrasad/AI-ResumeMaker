@@ -16,3 +16,6 @@ pydantic>=2.11.7
 passlib==1.7.4
 bcrypt==3.2.0
 psycopg2-binary>=2.9.9
+pydantic[email]
+python-jose[cryptography]
+python-multipart
